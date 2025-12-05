@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>平行四边形面积推导 (完美演示版)</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --accent-color: #d32f2f;
+            --bg-color: #f0f4f8;
+            --panel-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden; 
+        }
+
+        .main-wrapper {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            max-width: 1600px; /* 增加最大宽度 */
+            height: 98%;
+            background: var(--panel-bg);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 15px;
+            overflow: hidden;
+        }
+
+        /* --- 布局调整：左侧加宽，右侧固定 --- */
+        .left-stage {
+            flex: 1; /* 自动占据剩余空间 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-right: 2px dashed #eee;
+            padding-right: 15px;
+            overflow-y: auto; /* 允许垂直滚动 */
+            min-width: 0; /* 防止Flex子项溢出 */
+        }
+
+        .right-panel {
+            flex: 0 0 320px; /* 固定宽度 320px */
+            display: flex;
+            flex-direction: column;
+            background-color: #fbfbfb;
+            border-radius: 12px;
+            padding: 20px;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        h1 { margin: 5px 0 5px 0; color: #333; font-size: 1.6rem; }
+        .subtitle { color: #666; margin-bottom: 15px; font-size: 0.95rem; }
+
+        /* --- 画布调整 --- */
+        canvas {
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 25px 25px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            cursor: crosshair;
+            /* 关键：CSS宽度设为100%以适应容器，但HTML属性宽度很大以保持清晰度和容纳平移 */
+            width: 100%; 
+            height: auto;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
+        }
+
+        .controls {
+            width: 95%;
+            background: #f4f7f9;
+            padding: 15px 25px;
+            border-radius: 10px;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 1rem;
+        }
+
+        .control-row label { flex: 0 0 160px; font-weight: bold; }
+        .control-row input { flex: 1; margin: 0 15px; cursor: pointer; }
+        .val-label { font-family: monospace; font-weight: bold; color: #555; width: 50px; text-align: right; }
+
+        /* 右侧结论区样式 */
+        .conclusion-header {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .step-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .step-item {
+            opacity: 0;
+            transform: translateX(20px);
+            transition: all 0.5s ease;
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 5px solid transparent;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            font-size: 1.1rem;
+            line-height: 1.4;
+            display: none;
+        }
+
+        .step-item.show { opacity: 1; transform: translateX(0); display: block; border-left-color: var(--primary-color); }
+        .step-item.final { border-left-color: var(--accent-color); background-color: #fff5f5; font-size: 1.25rem; font-weight: bold; color: #d32f2f; }
+        .highlight { color: var(--accent-color); font-weight: 800; padding: 0 2px; }
+
+        /* 按钮 */
+        .action-btn {
+            padding: 10px 20px; font-size: 1rem; border: none; border-radius: 6px;
+            cursor: pointer; transition: 0.2s; font-weight: bold; color: white;
+        }
+        .btn-play { background-color: var(--primary-color); }
+        .btn-play:hover { background-color: #357abd; }
+        
+        .btn-next { 
+            background-color: #27ae60; width: 100%; padding: 12px; font-size: 1.1rem;
+            margin-top: 15px; box-shadow: 0 4px 0 #219150;
+        }
+        .btn-next:active { transform: translateY(4px); box-shadow: none; }
+        .btn-next:disabled { background-color: #ccc; box-shadow: none; cursor: not-allowed; }
+        .btn-reset { background-color: #95a5a6; padding: 4px 8px; font-size: 0.8rem; }
+
+    </style>
+</head>
+<body>
+
+    <div class="main-wrapper">
+        <div class="left-stage">
+            <h1>平行四边形面积推导</h1>
+            <p class="subtitle">任意位置切割 -> 动态平移拼合 -> 观察长宽关系</p>
+            
+            <canvas id="geoCanvas" width="1200" height="500"></canvas>
+
+            <div class="controls">
+                <div class="control-row">
+                    <label>1. 切割位置 (沿上底)</label>
+                    <input type="range" id="cutSlider" min="0" max="100" value="30">
+                    <span class="val-label" id="cutVal">30%</span>
+                </div>
+                
+                <div class="control-row">
+                    <label>2. 平移演示</label>
+                    <input type="range" id="animSlider" min="0" max="100" value="0">
+                    <span class="val-label" id="animVal">0%</span>
+                </div>
+
+                <div style="text-align: center; margin-top: 10px;">
+                    <button class="action-btn btn-play" onclick="animateDemo()">▶ 播放平移过程</button>
+                    <button class="action-btn" style="background:#7f8c8d; margin-left:10px;" onclick="resetDemo()">↺ 重置演示</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="conclusion-header">
+                结论推导
+                <button class="action-btn btn-reset" onclick="resetSteps()">重置</button>
+            </div>
+            
+            <div class="step-container" id="stepContainer">
+                <div class="step-item" id="step1">
+                    将平行四边形沿高剪开，平移左侧部分。
+                </div>
+                <div class="step-item" id="step2">
+                    拼成了一个标准的 <span class="highlight">长方形</span>。
+                </div>
+                <div class="step-item" id="step3">
+                    长方形的 <span class="highlight">长</span> = 平行四边形的 <span class="highlight">底</span>
+                </div>
+                <div class="step-item" id="step4">
+                    长方形的 <span class="highlight">宽</span> = 平行四边形的 <span class="highlight">高 (h)</span>
+                </div>
+                <div class="step-item final" id="step5">
+                    所以：<br>平行四边形面积 = <span class="highlight">底 × 高</span>
+                </div>
+            </div>
+
+            <button class="action-btn btn-next" id="nextBtn" onclick="nextStep()">👉 显示结论 (1/5)</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('geoCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 几何参数配置
+        const layout = {
+            startX: 50,       // 起始X (左边留白不用太多，因为我们是往右移)
+            startY: 120,      // 上底 Y
+            base: 450,        // 平行四边形底边长
+            height: 260,      // 高
+            shift: 160        // 倾斜偏移量
+        };
+
+        // 颜色配置
+        const colors = {
+            blue: 'rgba(74, 144, 226, 0.7)', // 固定部分
+            red: 'rgba(231, 76, 60, 0.8)',   // 移动部分
+            stroke: '#2c3e50',
+            dim: '#000'
+        };
+
+        // 状态变量
+        let currentStep = 0;
+        const totalSteps = 5;
+
+        // -----------------------------------------------------------
+        // 绘图主逻辑
+        // -----------------------------------------------------------
+        function draw() {
+            const cutRatio = parseInt(document.getElementById('cutSlider').value) / 100;
+            const animProgress = parseInt(document.getElementById('animSlider').value) / 100;
+
+            document.getElementById('cutVal').innerText = Math.round(cutRatio * 100) + '%';
+            document.getElementById('animVal').innerText = Math.round(animProgress * 100) + '%';
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 顶点定义
+            const TL = { x: layout.startX + layout.shift, y: layout.startY }; // 上底左
+            const BL = { x: layout.startX, y: layout.startY + layout.height }; // 下底下
+            const TR = { x: layout.startX + layout.shift + layout.base, y: layout.startY }; // 上底右
+            // 下底右界限 (BR_Bound) 用于限制切割点，保证切线垂直落在底边上
+            const BR_Bound = { x: layout.startX + layout.base, y: layout.startY + layout.height }; 
+            
+            // 2. 计算受限切割点 (Cut X)
+            // 有效切割区间：从 [TL.x] 到 [BR_Bound.x]
+            const validMinX = TL.x;
+            const validMaxX = BR_Bound.x;
+            const effectiveWidth = validMaxX - validMinX;
+            const cutX = validMinX + (effectiveWidth * cutRatio);
+
+            // 3. 动画参数
+            const moveDist = layout.base * animProgress; // 向右平移距离 = 底边长 * 进度
+
+            // --- 绘制背景虚线 (原形轮廓) ---
+            if (animProgress > 0) {
+                drawPoly([TL, TR, BR_Bound, BL], 'transparent', '#ccc', [6, 6]);
+            }
+
+            // --- 形状构建 ---
+            // 右侧固定部分 (蓝色)
+            // 形状：由切割线右侧的部分组成。
+            // 顶点：切割线上端, TR, BR_Bound, 切割线下端
+            const rightPoly = [
+                { x: cutX, y: layout.startY },
+                TR,
+                BR_Bound,
+                { x: cutX, y: layout.startY + layout.height }
+            ];
+
+            // 左侧移动部分 (红色)
+            // 形状：由切割线左侧的部分组成。
+            // 顶点：TL, 切割线上端, 切割线下端, BL
+            const leftPoly = [
+                TL,
+                { x: cutX, y: layout.startY },
+                { x: cutX, y: layout.startY + layout.height },
+                BL
+            ];
+
+            // 绘制固定部分
+            drawPoly(rightPoly, colors.blue, colors.stroke);
+
+            // 绘制移动部分 (应用 translate)
+            ctx.save();
+            ctx.translate(moveDist, 0);
+            drawPoly(leftPoly, colors.red, colors.stroke);
+
+            // 绘制移动部分上的高 (虚线+h)
+            if (animProgress < 0.99) {
+                drawVerticalLine(cutX, layout.startY, layout.startY + layout.height, '#fff', 2, [4,4]);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 18px Arial';
+                ctx.fillText('h', cutX - 15, layout.startY + layout.height/2);
+            }
+            ctx.restore();
+
+            // --- 动态标注 (核心修复) ---
+            drawDynamicLabels(animProgress, BL, BR_Bound, cutX, layout.height, layout.base);
+        }
+
+        // -----------------------------------------------------------
+        // 标注逻辑 (修复了对齐问题)
+        // -----------------------------------------------------------
+        function drawDynamicLabels(progress, BL, BR, cutX, h, base) {
+            ctx.fillStyle = colors.dim;
+            ctx.strokeStyle = colors.dim;
+            ctx.font = '18px Arial';
+            ctx.textAlign = 'center';
+            
+            const bottomY = BL.y + 35; // 底部文字Y坐标
+
+            if (progress < 0.95) {
+                // --- 状态1：平行四边形 ---
+                // 标注底
+                drawBracket(BL.x, bottomY, BR.x, bottomY, "底 (Base)");
+                // 标注高 (在左侧外面画一个独立的高，清晰)
+                // drawBracket(BL.x - 30, BL.y, BL.x - 30, BL.y - h, "h", true);
+            } else {
+                // --- 状态2：长方形 ---
+                // 此时红色部分已经拼到了右边。
+                // 整个长方形的左边界 = 固定部分的左边界 = cutX
+                // 整个长方形的右边界 = cutX + base
+                const rectLeft = cutX;
+                const rectRight = cutX + base;
+
+                // 1. 长 (= 平行四边形的底)
+                // 括号完全对齐长方形的左右边界
+                drawBracket(rectLeft, bottomY, rectRight, bottomY, "长 (= 平行四边形的底)");
+
+                // 2. 宽 (= h)
+                // 括号对齐长方形的左边界 (rectLeft)
+                // 位置稍微向左偏移一点点，避免重叠
+                drawBracket(rectLeft - 15, BL.y, rectLeft - 15, BL.y - h, "宽 (= h)", true);
+            }
+        }
+
+        // -----------------------------------------------------------
+        // 绘图工具函数
+        // -----------------------------------------------------------
+        function drawPoly(points, fill, stroke, dash=[]) {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+            ctx.closePath();
+            ctx.fillStyle = fill;
+            ctx.fill();
+            ctx.strokeStyle = stroke;
+            ctx.setLineDash(dash);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawVerticalLine(x, y1, y2, color, width, dash) {
+            ctx.beginPath();
+            ctx.moveTo(x, y1);
+            ctx.lineTo(x, y2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.setLineDash(dash);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawBracket(x1, y1, x2, y2, text, isVertical=false) {
+            ctx.beginPath();
+            const tick = 8;
+            if(!isVertical) {
+                // 水平括号
+                ctx.moveTo(x1, y1 - tick); 
+                ctx.lineTo(x1, y1);
+                ctx.lineTo(x2, y2); 
+                ctx.lineTo(x2, y2 - tick);
+                ctx.fillText(text, (x1+x2)/2, y1 + 22);
+            } else {
+                // 垂直括号
+                ctx.moveTo(x1 + tick, y1); 
+                ctx.lineTo(x1, y1);
+                ctx.lineTo(x2, y2); 
+                ctx.lineTo(x2 + tick, y2);
+                
+                ctx.save();
+                ctx.translate(x1 - 15, (y1+y2)/2);
+                ctx.rotate(-Math.PI/2); // 旋转文字
+                ctx.fillText(text, 0, 0);
+                ctx.restore();
+            }
+            ctx.stroke();
+        }
+
+        // -----------------------------------------------------------
+        // 交互逻辑
+        // -----------------------------------------------------------
+        let animId;
+        function animateDemo() {
+            if(animId) return;
+            const slider = document.getElementById('animSlider');
+            let val = parseInt(slider.value);
+            if(val >= 100) val = 0;
+            
+            function loop() {
+                val += 1.5;
+                if(val >= 100) {
+                    val = 100;
+                    slider.value = val;
+                    draw();
+                    animId = null;
+                    return; 
+                }
+                slider.value = val;
+                draw();
+                animId = requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        function resetDemo() {
+            cancelAnimationFrame(animId);
+            animId = null;
+            document.getElementById('animSlider').value = 0;
+            draw();
+        }
+
+        function nextStep() {
+            if (currentStep >= totalSteps) return;
+            currentStep++;
+            const el = document.getElementById('step' + currentStep);
+            el.classList.add('show');
+            
+            // 滚动处理
+            const container = document.getElementById('stepContainer');
+            setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
+
+            updateBtnState();
+        }
+
+        function resetSteps() {
+            currentStep = 0;
+            for(let i=1; i<=totalSteps; i++) {
+                document.getElementById('step'+i).classList.remove('show');
+            }
+            updateBtnState();
+        }
+
+        function updateBtnState() {
+            const btn = document.getElementById('nextBtn');
+            if (currentStep >= totalSteps) {
+                btn.innerText = "推导完成 ✅";
+                btn.disabled = true;
+                btn.style.backgroundColor = "#ccc";
+            } else {
+                btn.disabled = false;
+                btn.style.backgroundColor = "#27ae60";
+                if(currentStep === 0) btn.innerText = "👉 显示结论 (1/5)";
+                else btn.innerText = `👉 下一步 (${currentStep + 1}/5)`;
+            }
+        }
+
+        // 事件监听
+        document.getElementById('cutSlider').addEventListener('input', () => {
+             // 改变切割位置时，强制重置平移状态，避免视觉错乱
+             resetDemo();
+        });
+        document.getElementById('animSlider').addEventListener('input', draw);
+
+        // 初始化
+        window.onload = draw;
+
+    </script>
+</body>
+</html>
